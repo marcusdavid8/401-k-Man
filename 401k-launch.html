@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>401K-Man</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body {
+      margin: 0;
+      background: #000;
+      color: #fff;
+      font-family: sans-serif;
+      text-align: center;
+    }
+    canvas {
+      display: block;
+      margin: 10px auto;
+      background: #111;
+      border: 2px solid #fff;
+      width: 100%;
+      max-width: 672px;
+      height: auto;
+    }
+    #infoBox {
+      color: #ff0;
+      margin: 10px;
+      padding: 0 10px;
+    }
+    .controls {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin: 5px;
+    }
+    .controls button {
+      width: 60px;
+      height: 60px;
+      margin: 5px;
+      font-size: 24px;
+      border: none;
+      background: #444;
+      color: #fff;
+      border-radius: 10px;
+    }
+    .restart {
+      font-size: 18px;
+      padding: 10px 20px;
+      margin: 20px auto 30px;
+      background: #444;
+      color: #fff;
+      border-radius: 10px;
+      border: none;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <h1 style="font-size: 20px;">401K-Man: Collect Contributions, Avoid Debt!</h1>
+  <div id="infoBox">💡 Collect all 401(k) funds while avoiding bad choices</div>
+  <canvas id="gameCanvas" width="672" height="576"></canvas>
+  <div class="controls">
+    <button onclick="move('up')">⬆️</button>
+  </div>
+  <div class="controls">
+    <button onclick="move('left')">⬅️</button>
+    <button onclick="move('down')">⬇️</button>
+    <button onclick="move('right')">➡️</button>
+  </div>
+  <button class="restart" onclick="location.reload()">🔁 Restart Game</button>
+
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+
+    const tileSize = 24;
+    const maze = [
+      [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+      [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+      [1,0,1,1,1,1,1,0,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,1,1,0,1],
+      [1,0,1,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,1,0,1,0,0,0,1,1,0,1],
+      [1,0,1,0,1,0,1,0,1,0,1,1,1,1,1,1,1,0,1,0,1,0,1,0,1,1,0,1],
+      [1,0,1,0,1,0,1,0,1,0,1,0,0,0,0,0,1,0,1,0,1,0,1,0,1,1,0,1],
+      [1,0,1,0,1,0,1,0,1,0,1,0,1,1,1,0,1,0,1,0,1,0,1,0,1,1,0,1],
+      [1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,1,0,1],
+      [1,0,1,0,1,0,1,0,1,0,1,0,1,1,1,0,1,0,1,0,1,0,1,0,1,1,0,1],
+      [1,0,1,0,1,0,1,0,1,0,1,0,0,0,0,0,1,0,1,0,1,0,1,0,1,1,0,1],
+      [1,0,1,0,1,0,1,0,1,0,1,1,1,1,1,1,1,0,1,0,1,0,1,0,1,1,0,1],
+      [1,0,1,0,1,0,1,0,1,0,0,0,0,0,0,0,0,0,1,0,1,0,1,0,1,1,0,1],
+      [1,0,1,0,1,0,1,0,1,1,1,1,1,1,1,1,1,0,1,0,1,0,1,0,1,1,0,1],
+      [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+      [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+    ];
+
+    const player = { x: 1, y: 1, dx: 0, dy: 0, color: "yellow" };
+    const ghosts = [
+      { x: 13, y: 4, color: "red" },
+      { x: 14, y: 4, color: "cyan" },
+      { x: 13, y: 10, color: "pink" },
+      { x: 14, y: 10, color: "orange" }
+    ];
+
+    let score = 0;
+    let gameOver = false;
+    let messageTimer = 0;
+    let dotValue = 10;
+
+    function drawTile(x, y, type) {
+      const px = x * tileSize, py = y * tileSize;
+      if (type === 1) {
+        ctx.fillStyle = "#444"; ctx.fillRect(px, py, tileSize, tileSize);
+      } else if (type === 0) {
+        ctx.fillStyle = "#ff0";
+        ctx.beginPath(); ctx.arc(px + tileSize / 2, py + tileSize / 2, 4, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+
+    function drawPlayer() {
+      ctx.fillStyle = player.color;
+      ctx.beginPath();
+      ctx.arc(player.x * tileSize + tileSize / 2, player.y * tileSize + tileSize / 2, 8, 0.25 * Math.PI, 1.75 * Math.PI);
+      ctx.lineTo(player.x * tileSize + tileSize / 2, player.y * tileSize + tileSize / 2); ctx.fill();
+    }
+
+    function drawGhosts() {
+      for (const ghost of ghosts) {
+        ctx.fillStyle = ghost.color;
+        ctx.beginPath();
+        ctx.arc(ghost.x * tileSize + tileSize / 2, ghost.y * tileSize + tileSize / 2, 8, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+
+    function drawMaze() {
+      for (let y = 0; y < maze.length; y++)
+        for (let x = 0; x < maze[y].length; x++)
+          drawTile(x, y, maze[y][x]);
+    }
+
+    function moveGhostsTowardPlayer() {
+      for (const ghost of ghosts) {
+        const dx = player.x - ghost.x;
+        const dy = player.y - ghost.y;
+        const moveX = Math.abs(dx) > Math.abs(dy);
+        const stepX = dx > 0 ? 1 : -1;
+        const stepY = dy > 0 ? 1 : -1;
+        if (moveX && maze[ghost.y][ghost.x + stepX] !== 1) ghost.x += stepX;
+        else if (!moveX && maze[ghost.y + stepY][ghost.x] !== 1) ghost.y += stepY;
+      }
+    }
+
+    function update() {
+      if (gameOver) return;
+      const newX = player.x + player.dx, newY = player.y + player.dy;
+      if (maze[newY][newX] !== 1) {
+        player.x = newX; player.y = newY;
+        if (maze[newY][newX] === 0) {
+          maze[newY][newX] = 2;
+          score += dotValue;
+          if (score === 200) {
+            document.getElementById("infoBox").textContent = "📈 Great start! The sooner you start saving for retirement, the more your money can grow!";
+            messageTimer = 35;
+          } else if (score === 500) {
+            document.getElementById("infoBox").textContent = "📊 Keep going! Compound interest means your money grows faster since you earn interest on both the money you save and the interest it earns!";
+            messageTimer = 35;
+            dotValue = 500;
+          } else if (score === 9000) {
+            document.getElementById("infoBox").textContent = "💼 Great job saving! It might be time to consider changing your asset allocation";
+            messageTimer = 35;
+          }
+        }
+      }
+
+      for (const ghost of ghosts) {
+        if (ghost.x === player.x && ghost.y === player.y) {
+          document.getElementById("infoBox").textContent = "💸 You ran out of money for retirement!";
+          player.dx = player.dy = 0;
+          gameOver = true;
+        }
+      }
+
+      if (!gameOver) {
+        if (score >= 20000) {
+          document.getElementById("infoBox").textContent = "🏆 You saved $20,000! You're on track for retirement!";
+          gameOver = true;
+        } else if (messageTimer > 0) {
+          messageTimer--;
+        } else {
+          document.getElementById("infoBox").textContent = `💰 Score: $${score} in your 401(k)!`;
+        }
+      }
+    }
+
+    function gameTick() {
+      moveGhostsTowardPlayer();
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawMaze();
+      drawPlayer();
+      drawGhosts();
+      update();
+    }
+
+    function move(direction) {
+      if (gameOver) return;
+      switch (direction) {
+        case "up": player.dx = 0; player.dy = -1; break;
+        case "down": player.dx = 0; player.dy = 1; break;
+        case "left": player.dx = -1; player.dy = 0; break;
+        case "right": player.dx = 1; player.dy = 0; break;
+      }
+    }
+
+    setInterval(gameTick, 200);
+  </script>
+</body>
+</html>
+
+
+
+
